@@ -1,0 +1,41 @@
+# Thunderstore package configuration (tcli).
+# Docs: https://github.com/thunderstore-io/thunderstore-cli/wiki
+# Build:  tcli build   ·  Publish: TCLI_AUTH_TOKEN=... tcli publish
+# The C# build is done separately (admin.sh build valala-mods); tcli only zips.
+
+[config]
+schemaVersion = "0.0.1"
+
+[package]
+namespace = "RajaRakoto"
+name = "ValalaMods"
+versionNumber = "1.3.0"
+description = "Valala Mods: elemental classes (Lightning/Rock/Fire/Poison/Ice) for Mushoku Tensei's Wind Impulse, craftable quality-1-4 Valala rings, staff-free Wind Impulse with quality-scaled charge and jump, a second trinket slot, vanilla VFX, enemy-only damage, radial wheel, and elemental landing impacts."
+websiteUrl = "https://github.com/RajaRakoto/valheim"
+containsNsfwContent = false
+
+[package.dependencies]
+"denikson-BepInExPack_Valheim" = "5.4.2351"
+"BrayanRF-MushokuTenseiCore" = "3.19.27"
+"ValheimModding-Jotunn" = "2.30.2"
+"RandyKnapp-EpicLoot" = "0.14.13"
+
+[build]
+icon = "./icon.png"
+readme = "./README.md"
+outdir = "./build"
+
+[[build.copy]]
+source = "./bin/Release/ValalaMods.dll"
+target = "ValalaMods.dll"
+
+[[build.copy]]
+source = "./CHANGELOG.md"
+target = "CHANGELOG.md"
+
+[publish]
+repository = "https://thunderstore.io"
+communities = ["valheim"]
+
+[publish.categories]
+valheim = ["mods", "client-side", "server-side", "tweaks", "deep-north-update"]

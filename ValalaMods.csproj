@@ -1,0 +1,108 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>ValalaMods</AssemblyName>
+    <RootNamespace>ValalaMods</RootNamespace>
+    <Version>1.3.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Reference assemblies let Linux dotnet build net472 -->
+    <AutomaticallyUseReferenceAssemblyPackages>true</AutomaticallyUseReferenceAssemblyPackages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- BepInEx 5 core (profile) -->
+    <Reference Include="BepInEx">
+      <HintPath>/home/raja/.config/r2modmanPlus-local/Valheim/profiles/Default/BepInEx/core/BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>/home/raja/.config/r2modmanPlus-local/Valheim/profiles/Default/BepInEx/core/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Valheim managed -->
+    <Reference Include="UnityEngine">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.ParticleSystemModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.AssetBundleModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_valheim">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/assembly_valheim.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Target mod -->
+    <Reference Include="MT.Core">
+      <HintPath>/home/raja/.config/r2modmanPlus-local/Valheim/profiles/Default/BepInEx/plugins/BrayanRF-MushokuTenseiCore/MT.Core/MT.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="MT.Magia">
+      <HintPath>/home/raja/.config/r2modmanPlus-local/Valheim/profiles/Default/BepInEx/plugins/BrayanRF-MushokuTenseiCore/MT.Magia/MT.Magia.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Custom items, recipes and localizations -->
+    <Reference Include="Jotunn">
+      <HintPath>/home/raja/.config/r2modmanPlus-local/Valheim/profiles/Default/BepInEx/plugins/ValheimModding-Jotunn/Jotunn.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

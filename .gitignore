@@ -1,0 +1,19 @@
+# build residues (regenerable)
+bin/
+obj/
+
+# tcli package output
+build/
+
+# local artifacts
+*.user
+.vs/
+.idea/
+
+# never version game/mod DLLs copied by mistake
+*.dll
+!libs/**
+
+# own
+spawn.txt
+TODO.md
