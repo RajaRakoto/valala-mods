@@ -17,7 +17,7 @@ Made with ⚡ by Raja from Madagascar 🇲🇬
 - Five craftable **Valala silver rings**; the matching ring must be equipped for an
   element to work. Rings upgrade to **quality 4**.
 - **Second trinket slot** for every trinket through **ExtraSlotsCustomSlots** (optional).
-- **Wind Impulse can be cast without a staff** with any Valala ring quality (`Alt+E`); charge time and jump height scale with quality.
+- **Wind Impulse can be cast without a staff** with any Valala ring quality (`Alt+F`); own charge/jump pipeline, free movement, no charge animation, charge time and jump height scale with quality.
 - **Thor landing impact** and **elemental landing impacts** from a configurable fall height.
 - **High-fall lightning landing** for Lightning at 20 m or more.
 - Damage scales with the vanilla **ElementalMagic** skill.
@@ -67,7 +67,7 @@ The config file is created automatically on first launch at:
 | Key | Default | Meaning |
 |---|---|---|
 | Enabled | true | Master switch |
-| Mode | Add | `Add` = wind VFX + element · `Replace` = element only when its ring is equipped |
+| Mode | Add | `Add` = wind VFX + element · `Replace` = element only when its ring is equipped · staff-free casts always use the Valala VFX |
 | Duration | 1.5 | Lifetime of the strike effect (s) |
 | Radius | 0.5 | Radius of the strike visuals and cast damage |
 | Height | 1.8 | Elemental VFX height factor |
@@ -79,11 +79,11 @@ The config file is created automatically on first launch at:
 | RingDamageBonus | 0.15 | Damage bonus with the matching ring equipped (`0.15` = +15%) |
 | RingDamageBonusPerLevel | 0.15 | Extra damage per ring quality above 1 (`0.15` = +15%; quality 4 = +60% total) |
 | SecondTrinketSlot | true | Enable the extra trinket slot through ExtraSlotsCustomSlots |
-| StaffFreeWindImpulse | true | Allow staff-free Wind Impulse with any Valala ring quality |
-| StaffFreeCastKey | `Alt+E` | Shortcut for staff-free Wind Impulse (dropdown presets) |
+| StaffFreeWindImpulse | true | Allow staff-free Wind Impulse with any Valala ring quality; own charge/jump, free movement |
+| StaffFreeCastKey | `Alt+F` | Shortcut for staff-free Wind Impulse; plain `F` remains MT Toki Step |
 | LandingBoom | true | Elemental landing impact (requires the matching ring; no light flash for non-Lightning) |
 | LandingHeight | 10 | Minimum fall height for the landing impact (m) |
-| LandingRadius | 4 | Generic landing damage radius (m) |
+| LandingRadius | 4 | Landing and q3/q4 cast damage radius (m) |
 | LandingThunder | true | High-fall lightning VFX + damage (Lightning only) |
 | LandingThunderHeight | 20 | Minimum fall height for the high-fall strike (m) |
 | LandingThunderRadius | 4 | Damage radius of the high-fall strike (m) |
@@ -155,6 +155,10 @@ quality 4. Each quality adds damage and improves the staff-free Wind Impulse:
 
 Charge times assume Mushoku Tensei's default `Channeling/Speed = 0.4`.
 
+At quality **3 and 4**, releasing Wind Impulse uses the landing damage pulse at the
+caster's position instead of the small default cast pulse. It uses `LandingRadius`, the
+matching element and the same enemy-only filtering as a real landing.
+
 ### Second trinket slot
 
 The extra slot is provided by ExtraSlotsCustomSlots, then extended to every item whose
@@ -183,9 +187,26 @@ disabled and the rest of the mod works normally.
 
 With any **Valala ring** equipped, no staff, and Wind Impulse learned:
 
-- `Alt+E` starts the charge;
-- hold `Alt+E` to charge;
+- `Alt+F` starts the charge;
+- hold `Alt+F` to charge;
 - release to cast.
+
+The charge is owned by Valala Mods, not by the Mushoku Tensei cast pipeline:
+
+- the HUD is independent and appears immediately;
+- there is **no charge animation or posture**;
+- you can charge while walking, running, attacking or blocking;
+- the charge is cancelled and mana refunded on death, stagger, swim, encumbered,
+  dodge, menus/chat/console/inventory, ring removal, staff equip or another MT cast;
+- the jump uses the Valala quality scaling directly (`2.5/3.0/3.5/4.0×`);
+- q3/q4 cast damage uses the landing pulse once, without double-dipping;
+- the elemental Valala VFX is used, without the Mushoku Tensei wind lines;
+- Mushoku Tensei's no-fall-damage status and 6 s speed/jump buff are kept.
+
+The staff Wind Impulse cast remains unchanged.
+
+`Alt+F` is used because plain `F` is Mushoku Tensei's **Tōki Step**. While `Alt+F` is
+held for Wind Impulse, Tōki Step is suppressed; pressing `F` alone still dashes.
 
 The charge can be held indefinitely at its maximum; the spell no longer fires by itself.
 Charge time and jump power follow the ring quality table above. A small bar appears at
@@ -201,7 +222,8 @@ this shortcut is deliberately limited to Wind Impulse.
 
 ## Damage
 
-- A **single** elemental hit per cast.
+- A single elemental hit per cast at quality 1–2.
+- Quality 3–4 replaces it with the landing-style enemy-only damage pulse at cast time.
 - Native status effects are applied by the damage type itself.
 - Landing adds one enemy-only damage pulse.
 - The matching ring adds **+15%** damage by default.

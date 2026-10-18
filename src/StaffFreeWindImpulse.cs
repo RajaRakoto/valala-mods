@@ -4,6 +4,9 @@ using BepInEx.Configuration;
 using ValheimConsole = global::Console;
 using HarmonyLib;
 using MT.Core;
+using MT.Core.Habilidades;
+using MT.Core.I18n;
+using MT.Core.Mana;
 using MT.Magia;
 using UnityEngine;
 
@@ -12,23 +15,11 @@ namespace ValalaMods
     internal static class StaffFreeWindImpulse
     {
         private const string WindImpulseId = "impulso_viento";
+        private const string NoFallStatus = "MT_ImpulsoViento";
+        private const string DashStatus = "MT_ImpulsoCarrera";
         private const int MaxRingQuality = 4;
         private const float MaxChargeMultiplier = 5f;
-
-        private static readonly MethodInfo TryCastMethod = AccessTools.Method(typeof(Caster), "TryCast");
-        private static readonly MethodInfo EmpezarConTeclaMethod = AccessTools.Method(typeof(Caster), "EmpezarConTecla");
-        private static readonly MethodInfo ExecuteMethod = AccessTools.Method(typeof(Caster), "Execute");
-        private static readonly MethodInfo StartLoopAnimMethod = AccessTools.Method(typeof(Caster), "StartLoopAnim");
-        private static readonly MethodInfo KeepLoopAnimMethod = AccessTools.Method(typeof(Caster), "KeepLoopAnim");
-        private static readonly MethodInfo StopLoopAnimMethod = AccessTools.Method(typeof(Caster), "StopLoopAnim");
-        private static readonly PropertyInfo ChargingSpellProperty = AccessTools.Property(typeof(Caster), "HechizoCargando");
-
-        private static readonly AccessTools.FieldRef<Caster, float> ChargeStart =
-            AccessTools.FieldRefAccess<Caster, float>("_chargeStart");
-        private static readonly AccessTools.FieldRef<Caster, float> ChargePaid =
-            AccessTools.FieldRefAccess<Caster, float>("_chargePaid");
-        private static readonly AccessTools.FieldRef<Caster, float> ChargeMultiplier =
-            AccessTools.FieldRefAccess<Caster, float>("_chargeMult");
+        private const float MinChargeTime = 0.25f;
 
         private static readonly Type MagicPluginType = AccessTools.TypeByName("MT.Magia.MTMagiaPlugin");
         private static readonly FieldInfo ChargeSpeedField = MagicPluginType == null
@@ -37,24 +28,26 @@ namespace ValalaMods
         private static readonly FieldInfo ChargeManaField = MagicPluginType == null
             ? null
             : AccessTools.Field(MagicPluginType, "CargaMana");
+        private static readonly MethodInfo CanTakeInputMethod = AccessTools.Method(typeof(Caster), "CanTakeInput");
 
-        private static bool _bypassFocus;
-        private static bool _redirectExecute;
         private static bool _staffFreeCharging;
-        private static bool _executingWind;
+        private static float _chargeStart;
+        private static float _chargePaid;
+        private static float _chargeMult = 1f;
         private static int _chargeQuality;
+        private static Spell _chargeSpell;
+        private static Player _chargePlayer;
         private static bool _errorLogged;
 
         internal static bool IsCharging
         {
             get
             {
-                Caster caster = Caster.Instance;
+                Player player = Player.m_localPlayer;
                 return _staffFreeCharging &&
-                       caster != null &&
-                       Player.m_localPlayer != null &&
-                       !Player.m_localPlayer.IsDead() &&
-                       GetChargingSpell(caster) != null;
+                       player != null &&
+                       _chargePlayer == player &&
+                       !player.IsDead();
             }
         }
 
@@ -62,11 +55,7 @@ namespace ValalaMods
         {
             get
             {
-                Caster caster = Caster.Instance;
-                if (caster == null)
-                    return 0f;
-
-                return Mathf.Clamp01((ChargeMultiplier(caster) - 1f) / (MaxChargeMultiplier - 1f));
+                return Mathf.Clamp01((_chargeMult - 1f) / (MaxChargeMultiplier - 1f));
             }
         }
 
@@ -86,38 +75,19 @@ namespace ValalaMods
             try
             {
                 MethodInfo update = AccessTools.Method(typeof(Caster), "Update");
-                MethodInfo updateCharge = AccessTools.Method(typeof(Caster), "UpdateCharge");
-                MethodInfo cancel = AccessTools.Method(typeof(Caster), "CancelCurrentCast");
-                MethodInfo execute = AccessTools.Method(typeof(Caster), "Execute");
-                MethodInfo maxCharge = AccessTools.Method(typeof(Caster), "MaxCharge");
-                MethodInfo forceJump = AccessTools.Method(typeof(Character), "ForceJump");
-                MethodInfo levitationImpulse = AccessTools.Method(typeof(Levitacion), "Impulsar");
-                MethodInfo focus = AccessTools.Method(typeof(Focus), nameof(Focus.HasFocus));
+                Type pasoType = AccessTools.TypeByName("MT.Paso.HabilidadPaso");
+                MethodInfo tokiStep = pasoType == null ? null : AccessTools.Method(pasoType, "Usar");
 
-                if (update == null || updateCharge == null || cancel == null || execute == null ||
-                    maxCharge == null || forceJump == null || levitationImpulse == null || focus == null ||
-                    TryCastMethod == null || EmpezarConTeclaMethod == null ||
-                    ExecuteMethod == null || StartLoopAnimMethod == null ||
-                    KeepLoopAnimMethod == null || StopLoopAnimMethod == null ||
-                    ChargingSpellProperty == null)
-                    throw new MissingMethodException("Required MT.Magia methods were not found.");
+                if (update == null)
+                    throw new MissingMethodException("Required MT.Magia method Caster.Update was not found.");
 
                 harmony.Patch(update,
                     postfix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(UpdatePostfix)));
-                harmony.Patch(updateCharge,
-                    prefix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(UpdateChargePrefix)));
-                harmony.Patch(cancel,
-                    prefix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(CancelCurrentCastPrefix)));
-                harmony.Patch(execute,
-                    prefix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(ExecutePrefix)));
-                harmony.Patch(maxCharge,
-                    postfix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(MaxChargePostfix)));
-                harmony.Patch(forceJump,
-                    prefix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(ForceJumpPrefix)));
-                harmony.Patch(levitationImpulse,
-                    prefix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(LevitationImpulsePrefix)));
-                harmony.Patch(focus,
-                    prefix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(FocusPrefix)));
+                if (tokiStep != null)
+                {
+                    harmony.Patch(tokiStep,
+                        prefix: new HarmonyMethod(typeof(StaffFreeWindImpulse), nameof(TokiStepPrefix)));
+                }
             }
             catch (Exception e)
             {
@@ -125,308 +95,331 @@ namespace ValalaMods
             }
         }
 
+        private static bool TokiStepPrefix(Player p, ref bool __result)
+        {
+            if (!ShouldBlockTokiStep(p))
+                return true;
+
+            __result = false;
+            return false;
+        }
+
+        private static bool ShouldBlockTokiStep(Player player)
+        {
+            if (_staffFreeCharging)
+                return true;
+
+            if (!ValalaModsPlugin.Enabled.Value ||
+                !ValalaModsPlugin.EnableStaffFreeWindImpulse.Value ||
+                player == null ||
+                player.IsDead() ||
+                player.InPlaceMode() ||
+                IsInputBlocked() ||
+                Focus.HasFocus(player) ||
+                ValalaRings.GetBestEquippedQuality(player) <= 0 ||
+                !IsCastKeyHeld())
+                return false;
+
+            Spell spell = FindWindImpulse();
+            return spell != null &&
+                   Pergaminos.Knows(player, spell.Id) &&
+                   Pergaminos.CanCast(player, spell);
+        }
+
         private static void UpdatePostfix(Caster __instance)
         {
             try
             {
                 if (__instance == null)
+                {
+                    if (_staffFreeCharging)
+                        CancelCharge(Player.m_localPlayer);
                     return;
+                }
 
-                if (_staffFreeCharging && GetChargingSpell(__instance) == null)
-                    _staffFreeCharging = false;
+                if (_staffFreeCharging)
+                {
+                    UpdateStaffFreeCharge();
+                    return;
+                }
 
-                if (!ValalaModsPlugin.EnableStaffFreeWindImpulse.Value ||
+                if (!ValalaModsPlugin.Enabled.Value ||
+                    !ValalaModsPlugin.EnableStaffFreeWindImpulse.Value ||
                     __instance != Caster.Instance ||
                     IsInputBlocked() ||
                     !IsCastKeyDown())
                     return;
 
-                Player player = Player.m_localPlayer;
-                if (player == null || player.IsDead() || player.InPlaceMode() || Focus.HasFocus(player))
-                    return;
-
-                int quality = ValalaRings.GetBestEquippedQuality(player);
-                if (quality <= 0)
-                    return;
-
-                Spell spell = FindWindImpulse();
-                if (spell == null ||
-                    !Pergaminos.Knows(player, spell.Id) ||
-                    !Pergaminos.CanCast(player, spell))
-                    return;
-
-                _bypassFocus = true;
-                _redirectExecute = true;
-                _chargeQuality = quality;
-                try
-                {
-                    TryCastMethod.Invoke(__instance, new object[] { player, spell });
-                }
-                finally
-                {
-                    _bypassFocus = false;
-                    _redirectExecute = false;
-                }
+                TryStartCharge();
             }
             catch (Exception e)
             {
-                _bypassFocus = false;
-                _redirectExecute = false;
-                _staffFreeCharging = false;
-                LogErrorOnce("Staff-free Wind Impulse failed: " + e);
+                CancelCharge(Player.m_localPlayer);
+                LogErrorOnce("Staff-free Wind Impulse tick failed: " + e);
             }
         }
 
-        private static bool UpdateChargePrefix(Caster __instance, Player p)
+        private static void TryStartCharge()
         {
-            if (!_staffFreeCharging)
-                return true;
-
-            Spell spell = GetChargingSpell(__instance);
-            if (spell == null || spell.Id != WindImpulseId)
-            {
-                _staffFreeCharging = false;
-                return true;
-            }
-
-            try
-            {
-                UpdateStaffFreeCharge(__instance, p, spell);
-            }
-            catch (Exception e)
-            {
-                CancelCharge(__instance, p);
-                LogErrorOnce("Staff-free Wind Impulse update failed: " + e);
-            }
-
-            return false;
-        }
-
-        private static bool CancelCurrentCastPrefix()
-        {
-            return !_staffFreeCharging;
-        }
-
-        private static bool ExecutePrefix(Caster __instance, Player p, Spell s)
-        {
-            if (!_redirectExecute)
-                return true;
-
-            _redirectExecute = false;
-            if (s == null || s.Id != WindImpulseId)
-                return true;
-
-            try
-            {
-                object started = EmpezarConTeclaMethod.Invoke(__instance, new object[] { p, s, new Func<bool>(IsCastKeyHeld) });
-                _staffFreeCharging = started is bool value && value;
-            }
-            catch (Exception e)
-            {
-                _staffFreeCharging = false;
-                LogErrorOnce("Staff-free Wind Impulse charge failed: " + e);
-            }
-
-            return false;
-        }
-
-        private static void MaxChargePostfix(Player p, Spell s, ref float __result)
-        {
-            try
-            {
-                if (s == null || s.Id != WindImpulseId || p == null || Focus.HasFocus(p))
-                    return;
-
-                int quality = ValalaRings.GetBestEquippedQuality(p);
-                if (quality > 0)
-                    __result = ChargeMaxForQuality(quality);
-            }
-            catch (Exception e)
-            {
-                LogErrorOnce("Staff-free Wind Impulse max charge failed: " + e);
-            }
-        }
-
-        private static void ForceJumpPrefix(Character __instance, ref Vector3 vel)
-        {
-            if (__instance == null || __instance != Player.m_localPlayer)
+            Player player = Player.m_localPlayer;
+            if (player == null ||
+                player.IsDead() ||
+                player.InPlaceMode() ||
+                IsInputBlocked() ||
+                Focus.HasFocus(player) ||
+                Caster.IsActiveCasting ||
+                Caster.SegundoActivo)
                 return;
 
-            ApplyJumpScale(ref vel.y);
-        }
+            int quality = ValalaRings.GetBestEquippedQuality(player);
+            if (quality <= 0)
+                return;
 
-        private static void LevitationImpulsePrefix(ref Vector3 vel)
-        {
-            ApplyJumpScale(ref vel.y);
-        }
+            Spell spell = FindWindImpulse();
+            if (spell == null ||
+                !Pergaminos.Knows(player, spell.Id) ||
+                !Pergaminos.CanCast(player, spell))
+                return;
 
-        private static void ApplyJumpScale(ref float verticalVelocity)
-        {
-            try
+            if (Agotamiento.IsExhausted(player))
             {
-                if (!_executingWind)
-                    return;
-
-                Player player = Player.m_localPlayer;
-                int quality = ValalaRings.GetBestEquippedQuality(player);
-                if (quality <= 0)
-                    return;
-
-                float chargeMax = ChargeMaxForQuality(quality);
-                float progress = Mathf.InverseLerp(1f, chargeMax, Fx.ChargeMult);
-                float current = Mathf.Lerp(1f, 2.5f, progress);
-                float target = Mathf.Lerp(1f, JumpMaxForQuality(quality), progress);
-                if (current <= 0.001f)
-                    return;
-
-                verticalVelocity *= target / current;
+                ((Character)player).Message(
+                    MessageHud.MessageType.TopLeft,
+                    Tr.Get("magia_are_exhausted_can_t_cast"),
+                    0,
+                    null,
+                    false);
+                return;
             }
-            catch (Exception e)
+
+            float cooldown = Esperas.Restante(player, spell);
+            if (cooldown > 0f)
             {
-                LogErrorOnce("Staff-free Wind Impulse jump scaling failed: " + e);
+                ((Character)player).Message(
+                    MessageHud.MessageType.TopLeft,
+                    spell.Name + ": " + Mathf.CeilToInt(cooldown) + " s",
+                    0,
+                    null,
+                    false);
+                return;
             }
+
+            string reason = null;
+            if (!spell.Alcanza(player, out reason))
+            {
+                if (!string.IsNullOrEmpty(reason))
+                    ((Character)player).Message(MessageHud.MessageType.TopLeft, reason, 0, null, false);
+                return;
+            }
+
+            _staffFreeCharging = true;
+            _chargeStart = Time.time;
+            _chargePaid = 0f;
+            _chargeMult = 1f;
+            _chargeQuality = quality;
+            _chargeSpell = spell;
+            _chargePlayer = player;
         }
 
-        private static bool FocusPrefix(ref bool __result)
+        private static void UpdateStaffFreeCharge()
         {
-            if (!_bypassFocus)
-                return true;
-
-            __result = true;
-            return false;
-        }
-
-        private static void UpdateStaffFreeCharge(Caster caster, Player player, Spell spell)
-        {
-            if (!ValalaModsPlugin.EnableStaffFreeWindImpulse.Value ||
+            Player player = Player.m_localPlayer;
+            if (_chargePlayer != player)
+            {
+                CancelCharge(_chargePlayer);
+                return;
+            }
+            if (!ValalaModsPlugin.Enabled.Value ||
+                !ValalaModsPlugin.EnableStaffFreeWindImpulse.Value ||
                 player == null ||
                 player.IsDead() ||
                 player.IsStaggering() ||
                 player.InPlaceMode() ||
+                player.IsSwimming() ||
+                player.IsAttached() ||
+                player.IsEncumbered() ||
+                player.InDodge() ||
                 IsInputBlocked() ||
                 Focus.HasFocus(player) ||
-                ValalaRings.GetBestEquippedQuality(player) <= 0)
+                Caster.IsActiveCasting ||
+                Caster.SegundoActivo ||
+                _chargeSpell == null ||
+                !Pergaminos.Knows(player, _chargeSpell.Id) ||
+                !Pergaminos.CanCast(player, _chargeSpell))
             {
-                CancelCharge(caster, player);
+                CancelCharge(player);
+                return;
+            }
+
+            int quality = ValalaRings.GetBestEquippedQuality(player);
+            if (quality <= 0)
+            {
+                CancelCharge(player);
                 return;
             }
 
             if (!IsCastKeyHeld())
             {
-                FinishCharge(caster, player, spell);
+                FinishCharge(player);
                 return;
             }
 
-            int quality = ValalaRings.GetBestEquippedQuality(player);
             _chargeQuality = quality;
 
-            float elapsed = Time.time - ChargeStart(caster);
+            float elapsed = Time.time - _chargeStart;
             float maxCharge = ChargeMaxForQuality(quality);
-            float target = Mathf.Min(maxCharge, 1f + Mathf.Max(0f, elapsed - 0.25f) * ChargeSpeed());
-            float unitCost = Mathf.Max(Caster.ManaCost(player, spell) * ChargeManaCost(), 0.01f);
-            float paid = ChargePaid(caster);
+            float target = Mathf.Min(
+                maxCharge,
+                1f + Mathf.Max(0f, elapsed - MinChargeTime) * ChargeSpeed());
+            float unitCost = Mathf.Max(Caster.ManaCost(player, _chargeSpell) * ChargeManaCost(), 0.01f);
             float desired = (target - 1f) * unitCost;
 
-            if (desired > paid)
+            if (desired > _chargePaid)
             {
-                float delta = desired - paid;
-                if (player.GetEitr() - Caster.ManaCost(player, spell) >= delta)
+                float delta = desired - _chargePaid;
+                if (player.GetEitr() - Caster.ManaCost(player, _chargeSpell) >= delta)
                 {
                     ((Character)player).UseEitr(delta);
-                    paid += delta;
-                    ChargePaid(caster) = paid;
+                    _chargePaid += delta;
                 }
             }
 
-            ChargeMultiplier(caster) = Mathf.Min(1f + paid / unitCost, maxCharge);
-
-            if (elapsed >= 0.25f)
-            {
-                StartLoopAnim(caster, player);
-                KeepLoopAnim(caster, player);
-            }
+            _chargeMult = Mathf.Min(1f + _chargePaid / unitCost, maxCharge);
         }
 
-        private static void FinishCharge(Caster caster, Player player, Spell spell)
+        private static void FinishCharge(Player player)
         {
-            ChargePaid(caster) = 0f;
-            _staffFreeCharging = false;
-            SetChargingSpell(caster, null);
-            StopLoopAnim(caster, player);
+            Spell spell = _chargeSpell;
+            int quality = _chargeQuality;
+            float charge = _chargeMult;
+            float paid = _chargePaid;
 
-            _executingWind = true;
+            _staffFreeCharging = false;
+            _chargeSpell = null;
+            _chargeQuality = 0;
+            _chargePlayer = null;
+            _chargePaid = 0f;
+            _chargeMult = 1f;
+
+            if (player == null || spell == null || player.IsDead())
+            {
+                Refund(player, paid);
+                return;
+            }
+
+            quality = ValalaRings.GetBestEquippedQuality(player);
+            if (quality <= 0 ||
+                !Pergaminos.Knows(player, spell.Id) ||
+                !Pergaminos.CanCast(player, spell))
+            {
+                Refund(player, paid);
+                return;
+            }
+
+            if (Esperas.Restante(player, spell) > 0f)
+            {
+                Refund(player, paid);
+                return;
+            }
+
             try
             {
-                ExecuteMethod.Invoke(caster, new object[] { player, spell });
+                bool conToki;
+                if (!spell.Pagar(player, out conToki))
+                {
+                    Refund(player, paid);
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                Refund(player, paid);
+                LogErrorOnce("Staff-free Wind Impulse payment failed: " + e);
+                return;
+            }
+
+            try
+            {
+                UsoMagia.Lanzado(player, spell);
+                Caster.PlayLaunchSound(player, spell);
+                ((Character)player).RaiseSkill(
+                    Escuelas.Skill(spell.School),
+                    Mathf.Max(spell.Mana, 5f) / 10f);
+
+                ApplyJump(player, quality, charge);
+                ApplyLaunchStatuses(player);
+                ValalaModsPlugin.TrySpawnElementStrike(player);
             }
             catch (Exception e)
             {
                 LogErrorOnce("Staff-free Wind Impulse release failed: " + e);
             }
-            finally
-            {
-                _executingWind = false;
-            }
         }
 
-        private static void CancelCharge(Caster caster, Player player)
+        private static void ApplyLaunchStatuses(Player player)
         {
-            float paid = ChargePaid(caster);
-            ChargePaid(caster) = 0f;
-            ChargeMultiplier(caster) = 1f;
-            _staffFreeCharging = false;
-            SetChargingSpell(caster, null);
-            StopLoopAnim(caster, player);
+            SEMan seman = ((Character)player).GetSEMan();
+            if (seman == null)
+                return;
 
+            int noFallHash = StringExtensionMethods.GetStableHashCode(NoFallStatus);
+            seman.RemoveStatusEffect(noFallHash, false);
+            seman.AddStatusEffect(noFallHash, true, 0, 0f, (short)(-1));
+
+            Fx.AddSE((Character)player, DashStatus);
+        }
+
+        private static void ApplyJump(Player player, int quality, float charge)
+        {
+            Vector3 direction = GameCamera.instance != null
+                ? GameCamera.instance.transform.forward
+                : Fx.AimDir(player);
+
+            float maxCharge = ChargeMaxForQuality(quality);
+            float progress = Mathf.InverseLerp(1f, maxCharge, Mathf.Clamp(charge, 1f, maxCharge));
+            float power = Mathf.Lerp(1f, JumpMaxForQuality(quality), progress);
+
+            if (Levitacion.Active)
+            {
+                Levitacion.Impulsar(direction * 26f * power);
+                return;
+            }
+
+            float vertical = direction.y * 26f * power + 4f;
+            if (((Character)player).IsOnGround() && direction.y < 0.15f)
+                vertical = Mathf.Max(vertical, 6f);
+
+            ((Character)player).ForceJump(new Vector3(
+                direction.x * 26f * power,
+                vertical,
+                direction.z * 26f * power), false);
+            ImpulsoInercia.Lanzar(new Vector3(direction.x, 0f, direction.z) * 11f * power);
+        }
+
+        private static void CancelCharge(Player player)
+        {
+            float paid = _chargePaid;
+            _staffFreeCharging = false;
+            _chargeSpell = null;
+            _chargeQuality = 0;
+            _chargePlayer = null;
+            _chargePaid = 0f;
+            _chargeMult = 1f;
+
+            Refund(player, paid);
+        }
+
+        private static void Refund(Player player, float paid)
+        {
             if (player != null && paid > 0f)
                 ((Character)player).AddEitr(paid);
         }
 
-        private static void StartLoopAnim(Caster caster, Player player)
+        private static float ReadConfig(FieldInfo field, float fallback)
         {
-            try
-            {
-                StartLoopAnimMethod.Invoke(caster, new object[] { player, null });
-            }
-            catch (Exception e)
-            {
-                LogErrorOnce("Staff-free Wind Impulse loop animation failed: " + e);
-            }
-        }
-
-        private static void KeepLoopAnim(Caster caster, Player player)
-        {
-            try
-            {
-                KeepLoopAnimMethod.Invoke(caster, new object[] { player });
-            }
-            catch (Exception e)
-            {
-                LogErrorOnce("Staff-free Wind Impulse loop animation failed: " + e);
-            }
-        }
-
-        private static void StopLoopAnim(Caster caster, Player player)
-        {
-            try
-            {
-                StopLoopAnimMethod.Invoke(caster, new object[] { player });
-            }
-            catch (Exception e)
-            {
-                LogErrorOnce("Staff-free Wind Impulse loop animation stop failed: " + e);
-            }
-        }
-
-        private static Spell GetChargingSpell(Caster caster)
-        {
-            return caster == null ? null : ChargingSpellProperty.GetValue(caster, null) as Spell;
-        }
-
-        private static void SetChargingSpell(Caster caster, Spell spell)
-        {
-            if (caster != null)
-                ChargingSpellProperty.SetValue(caster, spell, null);
+            return field != null && field.GetValue(null) is ConfigEntry<float> entry
+                ? entry.Value
+                : fallback;
         }
 
         private static float ChargeSpeed()
@@ -437,13 +430,6 @@ namespace ValalaMods
         private static float ChargeManaCost()
         {
             return ReadConfig(ChargeManaField, 6f);
-        }
-
-        private static float ReadConfig(FieldInfo field, float fallback)
-        {
-            return field != null && field.GetValue(null) is ConfigEntry<float> entry
-                ? entry.Value
-                : fallback;
         }
 
         private static float ChargeMaxForQuality(int quality)
@@ -508,13 +494,29 @@ namespace ValalaMods
 
         private static bool IsInputBlocked()
         {
-            if (MTKeys.Bloqueadas || ValheimConsole.IsVisible() || TextInput.IsVisible())
+            if (!Application.isFocused ||
+                MTKeys.Bloqueadas ||
+                Caster.MenuOpen ||
+                ElementSelectorUi.IsMenuVisible)
                 return true;
 
-            if (Chat.instance != null && Chat.instance.HasFocus())
-                return true;
+            try
+            {
+                if (CanTakeInputMethod != null &&
+                    !(bool)CanTakeInputMethod.Invoke(null, null))
+                    return true;
+            }
+            catch
+            {
+                // Fall through to the explicit checks below.
+            }
 
-            return ElementSelectorUi.IsMenuVisible;
+            return ValheimConsole.IsVisible() ||
+                   global::Menu.IsVisible() ||
+                   InventoryGui.IsVisible() ||
+                   TextInput.IsVisible() ||
+                   Minimap.IsOpen() ||
+                   (Chat.instance != null && Chat.instance.HasFocus());
         }
 
         private static void LogErrorOnce(string message)

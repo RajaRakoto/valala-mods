@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.3.3
+
+- Staff-free Wind Impulse now uses a Valala-owned charge and jump pipeline instead of the Mushoku Tensei cast pipeline.
+- The charge HUD is independent and appears immediately.
+- Removed the charge animation and posture: charging works while walking, running, attacking and blocking.
+- Charge is cancelled and mana refunded on death, stagger, swim, encumbered, dodge, menu/chat/console/inventory, ring removal, staff equip or another MT cast.
+- Jump power now comes directly from Valala quality scaling (`2.5/3.0/3.5/4.0×`) without post-scaling MT `ForceJump`.
+- Kept Mushoku Tensei's no-fall-damage status and 6 s speed/jump buff.
+- Staff-free release now uses the Valala elemental VFX only, without Mushoku Tensei wind lines.
+- q3/q4 cast damage still uses the landing pulse once, without double-dipping.
+- Staff Wind Impulse cast remains unchanged.
+
+## 1.3.2
+
+- Ring quality 3 and 4 now use the landing damage pulse for the Wind Impulse cast itself.
+- The cast pulse uses `LandingRadius`, the matching element damage and the same enemy-only target rules as landing.
+- The small default cast pulse is replaced at quality 3–4, so damage is not doubled.
+
+## 1.3.1
+
+- Fixed staff-free Wind Impulse auto-cancelling after ~1 s through MT attack safety (`AtaqueSeguro` → `Caster.Reiniciar`).
+- Staff-free charge now counts as busy for MT attack safety, and `Caster.Reiniciar` is blocked while charging.
+- Default shortcut is now `Alt+F`; old `F` configs are migrated automatically.
+- Tōki Step is suppressed while `Alt+F` is held for Wind Impulse; `F` alone still dashes.
+- Moved the charge bar HUD slightly higher.
+
 ## 1.3.0
 
 - Staff-free Wind Impulse now works with **every Valala ring quality**, not only quality 4.

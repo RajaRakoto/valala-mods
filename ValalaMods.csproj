@@ -4,7 +4,7 @@
     <TargetFramework>net472</TargetFramework>
     <AssemblyName>ValalaMods</AssemblyName>
     <RootNamespace>ValalaMods</RootNamespace>
-    <Version>1.3.0</Version>
+    <Version>1.3.3</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -85,6 +85,10 @@
     </Reference>
     <Reference Include="assembly_valheim">
       <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/assembly_valheim.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_utils">
+      <HintPath>/home/raja/GAMES/SteamLibrary/steamapps/common/Valheim/valheim_Data/Managed/assembly_utils.dll</HintPath>
       <Private>false</Private>
     </Reference>
 

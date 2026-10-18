@@ -5,6 +5,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using MT.Core;
 using MT.Magia;
 using ValalaMods.NorseFx;
 using UnityEngine;
@@ -22,7 +23,8 @@ namespace ValalaMods
     {
         public const string PluginGuid = "odin.valala.raja.mods";
         public const string PluginName = "Valala Mods";
-        public const string PluginVersion = "1.3.0";
+        public const string PluginVersion = "1.3.3";
+        private const int CastLandingDamageMinQuality = 3;
 
         internal static ConfigEntry<bool> Enabled;
         internal static ConfigEntry<string> Mode;
@@ -80,7 +82,7 @@ namespace ValalaMods
             Enabled = Config.Bind("General", "Enabled", true,
                 "Add or replace an elemental VFX on the Wind Impulse / Wind Boost dash.");
             Mode = Config.Bind("General", "Mode", "Add",
-                new ConfigDescription("Add = keep the wind VFX and overlay the selected element. Replace = selected element only when its ring is equipped.",
+                new ConfigDescription("Add = keep the wind VFX and overlay the selected element. Replace = selected element only when its ring is equipped. Staff-free casts always use the Valala VFX.",
                     new AcceptableValueList<string>("Add", "Replace")));
             Duration = Config.Bind("General", "Duration", 1.5f,
                 "Lifetime of the single elemental strike VFX in seconds.");
@@ -117,10 +119,10 @@ namespace ValalaMods
             EnableSecondTrinketSlot = Config.Bind("Rings", "SecondTrinketSlot", true,
                 "Enable a second trinket slot through ExtraSlotsCustomSlots. Set ExtraSlotsCustomSlots custom slot 1 Enabled=true.");
             EnableStaffFreeWindImpulse = Config.Bind("Rings", "StaffFreeWindImpulse", true,
-                "Cast Wind Impulse without a staff using any Valala ring quality. Charge time and jump height scale with ring quality.");
-            StaffFreeCastKey = Config.Bind("Rings", "StaffFreeCastKey", "Alt+E",
+                "Cast Wind Impulse without a staff using any Valala ring quality. Own charge/jump system with free movement and no charge animation.");
+            StaffFreeCastKey = Config.Bind("Rings", "StaffFreeCastKey", "Alt+F",
                 new ConfigDescription(
-                    "Shortcut for staff-free Wind Impulse.",
+                    "Shortcut for staff-free Wind Impulse. Alt+F keeps plain F free for MT Toki Step.",
                     new AcceptableValueList<string>(StaffFreeCastKeyPresets)));
             LandingBoom = Config.Bind("General", "LandingBoom", true,
                 "Spawn an elemental landing impact when landing after a fall (requires the matching ring; non-Lightning impacts have no light flash).");
@@ -130,7 +132,7 @@ namespace ValalaMods
                     new AcceptableValueRange<float>(4f, 50f)));
             LandingRadius = Config.Bind("General", "LandingRadius", 4f,
                 new ConfigDescription(
-                    "Generic elemental landing damage radius, meters. Damage uses DamageMin/DamageMax, the ElementalMagic skill and the ring bonus.",
+                    "Elemental landing and q3/q4 cast damage radius, meters. Damage uses DamageMin/DamageMax, the ElementalMagic skill and the ring bonus.",
                     new AcceptableValueRange<float>(1f, 10f)));
             LandingThunder = Config.Bind("General", "LandingThunder", true,
                 "Spawn the high-fall lightning VFX on landing from a higher fall (Lightning class only).");
@@ -144,6 +146,7 @@ namespace ValalaMods
                     new AcceptableValueRange<float>(1f, 10f)));
 
             MigrateSelectedElement();
+            MigrateStaffFreeCastKey();
             RefreshMenuKeyCode();
             RefreshSelectedElement();
             MenuKey.SettingChanged += (_, _) => RefreshMenuKeyCode();
@@ -171,7 +174,7 @@ namespace ValalaMods
                 _harmony.PatchAll(typeof(LandingBoomPatch));
                 SecondTrinketSlot.Apply(_harmony);
                 StaffFreeWindImpulse.Initialize(_harmony);
-                Log.LogInfo(PluginName + " loaded: patched WindImpulseVfx.Spawn (Mode=" + Mode.Value + ", rings + elemental VFX), landing effects and staff-free Wind Impulse.");
+                Log.LogInfo(PluginName + " loaded: patched WindImpulseVfx.Spawn (Mode=" + Mode.Value + ", rings + elemental VFX), landing effects and staff-free Wind Impulse (own charge/jump).");
             }
             catch (Exception e)
             {
@@ -239,6 +242,31 @@ namespace ValalaMods
 
             SelectedElement.Value = "Roche";
             Log.LogInfo("Migrated SelectedElement from Vent/Wind to Roche.");
+        }
+
+        private void MigrateStaffFreeCastKey()
+        {
+            try
+            {
+                if (!EnableStaffFreeWindImpulse.Value)
+                    return;
+
+                if (!Enum.TryParse(StaffFreeCastKey.Value, true, out KeyCode key) || key == KeyCode.None)
+                    return;
+
+                bool conflicts = key == KeyCode.F ||
+                    (MTKeys.Paso != null && key == MTKeys.Paso.Value);
+                if (!conflicts)
+                    return;
+
+                StaffFreeCastKey.Value = "Alt+F";
+                Config.Save();
+                Log.LogWarning("StaffFreeCastKey " + key + " conflicts with MT Toki Step; migrated to Alt+F.");
+            }
+            catch (Exception e)
+            {
+                Log.LogWarning("Could not migrate StaffFreeCastKey: " + e.Message);
+            }
         }
 
         private static void ValidateElementRegistry()
@@ -329,7 +357,8 @@ namespace ValalaMods
             if (!Enabled.Value)
                 return false;
 
-            if (!AffectMk1Jump.Value && IsFromMk1Jump())
+            bool fromMk1Jump = IsFromMk1Jump();
+            if (!AffectMk1Jump.Value && fromMk1Jump)
                 return false;
 
             try
@@ -344,7 +373,23 @@ namespace ValalaMods
                 RpcSync.Broadcast(element, player.transform.position, Duration.Value, Radius.Value, Height.Value, color);
 
                 if (Damage.Value)
-                    DamageEnemies(player, Radius.Value, element);
+                {
+                    bool castLandingPulse = !fromMk1Jump &&
+                        ValalaRings.GetEquippedQuality(player, element) >= CastLandingDamageMinQuality;
+
+                    if (castLandingPulse)
+                    {
+                        DamageEnemiesAt(
+                            player,
+                            player.transform.position,
+                            LandingRadius.Value,
+                            element);
+                    }
+                    else
+                    {
+                        DamageEnemies(player, Radius.Value, element);
+                    }
+                }
 
                 return true;
             }

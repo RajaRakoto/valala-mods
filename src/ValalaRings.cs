@@ -91,7 +91,7 @@ namespace ValalaMods
             return 1f + bonus + perLevel * (quality - 1);
         }
 
-        private static int GetEquippedQuality(Player player, Element element)
+        internal static int GetEquippedQuality(Player player, Element element)
         {
             string prefabName = PrefabName(element);
             if (player == null || prefabName == null)

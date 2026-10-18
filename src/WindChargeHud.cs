@@ -6,7 +6,7 @@ namespace ValalaMods
     {
         private const float BaseWidth = 260f;
         private const float BaseHeight = 10f;
-        private const float BaseBottom = 170f;
+        private const float BaseBottom = 220f;
 
         private void OnGUI()
         {
