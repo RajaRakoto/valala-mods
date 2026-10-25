@@ -20,6 +20,11 @@ Made with ⚡ by Raja from Madagascar 🇲🇬
 - **Wind Impulse can be cast without a staff** with any Valala ring quality (`Alt+F`); own charge/jump pipeline, free movement, no charge animation, charge time and jump height scale with quality.
 - **Thor landing impact** and **elemental landing impacts** from a configurable fall height.
 - **High-fall lightning landing** for Lightning at 20 m or more.
+- **Mjolnir impact lightning**: thrown Mjolnir impacts trigger a lightning strike and configurable area damage on enemies and structures; Mjolnir's native terrain crater is preserved.
+- **Bundled ValalaMjolnir library**: the Mjolnir library ships inside the Valala
+  package and is loaded by BepInEx as a separate plugin; no standalone install is needed.
+- **Reworked Mjolnir recipe**: crafted only at a fully upgraded Black Forge, from
+  endgame materials and a crafted Dundr.
 - Damage scales with the vanilla **ElementalMagic** skill.
 - Optional **multiplayer sync**: other players see your effects.
 - Fully configurable, with **live config reload** (no restart needed).
@@ -46,23 +51,68 @@ Optional for the second trinket slot:
 - **ExtraSlotsCustomSlots** (`shudnal-ExtraSlotsCustomSlots`) `1.0.23`.
 
 The plugin has hard `BepInDependency` entries on `mushokutensei.magia`,
-`com.jotunn.jotunn` and `randyknapp.mods.epicloot`, and soft dependencies on
-`shudnal.ExtraSlots` and `shudnal.ExtraSlotsCustomSlots`.
+`com.jotunn.jotunn`, `randyknapp.mods.epicloot` and the bundled
+ValalaMjolnir library, and soft dependencies on `shudnal.ExtraSlots` and
+`shudnal.ExtraSlotsCustomSlots`.
+
+## Bundled ValalaMjolnir
+
+Valala Mods ships the **ValalaMjolnir** library under `ValalaMjolnir/` in its
+plugin folder. BepInEx loads it as a separate plugin and Valala declares it as a hard
+dependency, so it loads after the bundled library. Do **not** install another copy of
+this plugin at the same time: two copies of the same plugin GUID would conflict.
+
+The bundled library keeps its own settings file in
+`BepInEx/config/odin.valala.raja.mods.mjolnir.cfg`.
+Valala anchors Mjolnir's ability HUD to the bottom-right corner; `RightMargin` and
+`BottomMargin` live in Valala's own config under `[Mjolnir HUD]`. The plugin folder
+ships only the library DLLs and its README, never runtime configuration files.
 
 ## Installation
 
-Install through Thunderstore Mod Manager / r2modman — dependencies are handled automatically.
+Install through Gale — dependencies are handled automatically.
 
 **Dedicated servers and clients must install Valala Mods.** The rings are custom items
 registered through Jotunn, so the server needs the same prefabs and recipes as the clients.
 
-Manual install: place `ValalaMods.dll` into `BepInEx/plugins/`.
+Manual install: place `ValalaMods.dll` and the `ValalaMjolnir/` folder into
+`BepInEx/plugins/RajaRakoto-ValalaMods/`.
 
 ## Configuration
 
 The config file is created automatically on first launch at:
 
 `BepInEx/config/odin.valala.raja.mods.cfg`
+
+Mjolnir settings use a separate Valala-owned file:
+
+`BepInEx/config/odin.valala.raja.mods.mjolnir.cfg`
+
+Valala's tuned Mjolnir terrain, throw, impact and HUD values ship as defaults.
+Existing user customisations are preserved; untouched old defaults are migrated.
+
+### Mjolnir recipe
+
+Valala rewrites Mjolnir's existing recipe after Jotunn registers it. It is crafted only
+at a **level 6 Black Forge**, never at a regular Forge. Mjolnir's own
+`CraftingStation` and `MinimumStationLevel` settings are ignored; `Craftable` still
+disables the recipe.
+
+| Material | Amount |
+|---|---:|
+| Flametal | 30 |
+| Celestial Feather | 10 |
+| Molten Core | 10 |
+| Proustite Powder | 10 |
+| Frostcore | 10 |
+| Nornathread | 10 |
+| Thunderblood Essence | 10 |
+| Thunder Stone | 20 |
+| Yggdrasil Wood | 30 |
+| Refined Eitr | 20 |
+| Carapace | 20 |
+| Gold | 20 |
+| Dundr (`StaffLightning`, crafted at the Galdr table) | 1 |
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -235,6 +285,8 @@ this shortcut is deliberately limited to Wind Impulse.
 - All peers must use the **same Valala Mods version**; the landing RPC signature changed
   in `1.1.0`.
 - With `SyncToOthers=true` (default), effects are broadcast so other players see them.
+- A headless dedicated server skips client input, the element wheel and the charge HUD;
+  rings, recipes, damage and RPC handlers remain active.
 - A headless dedicated server does not render VFX, but it still registers the custom
   rings, recipes and RPC handlers.
 

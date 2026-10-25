@@ -9,8 +9,8 @@ schemaVersion = "0.0.1"
 [package]
 namespace = "RajaRakoto"
 name = "ValalaMods"
-versionNumber = "1.3.3"
-description = "Valala Mods: elemental classes (Lightning/Rock/Fire/Poison/Ice) for Wind Impulse, quality 1-4 Valala rings, staff-free charge and jump, a second trinket slot, enemy-only damage and elemental landing effects."
+versionNumber = "1.5.1"
+description = "Valala Mods: elemental classes for Wind Impulse, Valala rings, staff-free charge, a second trinket slot, enemy-only damage, elemental landings and a bundled ValalaMjolnir library."
 websiteUrl = "https://github.com/RajaRakoto/valheim"
 containsNsfwContent = false
 
@@ -32,6 +32,18 @@ target = "ValalaMods.dll"
 [[build.copy]]
 source = "./CHANGELOG.md"
 target = "CHANGELOG.md"
+
+[[build.copy]]
+source = "./libs/ValalaMjolnir/ValheimMjolnir.dll"
+target = "ValalaMjolnir/ValheimMjolnir.dll"
+
+[[build.copy]]
+source = "./libs/ValalaMjolnir/ValheimMjolnir.Core.dll"
+target = "ValalaMjolnir/ValheimMjolnir.Core.dll"
+
+[[build.copy]]
+source = "./libs/ValalaMjolnir/README.md"
+target = "ValalaMjolnir/README.md"
 
 [publish]
 repository = "https://thunderstore.io"

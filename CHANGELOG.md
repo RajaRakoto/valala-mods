@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.5.1
+
+- Internal maintenance update.
+- Rebalanced Mjolnir's Black Forge recipe: rare endgame materials are roughly halved and biome resources reduced, while the level 6 Black Forge and Dundr gates remain.
+- Rewrote Mjolnir's tooltip in English and French with its Norse forge lore, Thor, and the dignity system.
+- Shipped the tuned Mjolnir terrain, throw, impact and HUD values as defaults; untouched old defaults migrate while user customisations stay.
+- Stopped documenting the private Mjolnir menu access in public docs.
+- Moved Mjolnir's ability HUD to the bottom-right corner. `RightMargin` and `BottomMargin` live in Valala's config under `[Mjolnir HUD]`.
+- Runtime config files are no longer deployed inside `ValalaMjolnir/`; only Mjolnir's `BepInEx/config` file is live.
+- Added a lightning strike and configurable area damage on thrown Mjolnir impacts.
+- Kept Mjolnir's native terrain crater; player-built damage still respects ward access.
+
+## 1.5.0
+
+- Moved Mjolnir's crafting recipe to a fully upgraded Black Forge.
+- Replaced its materials with endgame resources, including both vanilla lightning materials.
+- Added a crafted `StaffLightning` (Dundr) component to the recipe.
+- Rewrites the existing Mjolnir recipe after Jotunn registration; no duplicate recipe or third-party file edit.
+
+## 1.4.1
+
+- Redirected Mjolnir's BepInEx config to `BepInEx/config/odin.valala.raja.mods.mjolnir.cfg`.
+- Fall back to the default Mjolnir config path if migration or redirection fails.
+
+## 1.4.0
+
+- Added the **ValalaMjolnir** library under `ValalaMjolnir/` with its two DLLs and README.
+- Added a hard `BepInDependency` so Valala loads after the bundled library plugin.
+- `admin.sh deploy` and the Thunderstore package now copy the `libs/ValalaMjolnir` folder.
+- Added a startup log line confirming the bundled library version and load path.
+
+## 1.3.4
+
+- Fixed a dedicated-server crash on startup: the staff-free Wind Impulse input check called `MTKeys.Bloqueadas` (`GUIUtility.keyboardControl`) on a headless server, causing a native abort.
+- Headless servers now skip client-only input, element wheel and charge HUD modules.
+- Rings, recipes, RPC handlers and elemental damage remain active on dedicated servers.
+
 ## 1.3.3
 
 - Staff-free Wind Impulse now uses a Valala-owned charge and jump pipeline instead of the Mushoku Tensei cast pipeline.

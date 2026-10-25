@@ -72,6 +72,9 @@ namespace ValalaMods
 
         internal static void Initialize(Harmony harmony)
         {
+            if (ValalaModsPlugin.IsHeadless)
+                return;
+
             try
             {
                 MethodInfo update = AccessTools.Method(typeof(Caster), "Update");
@@ -97,6 +100,9 @@ namespace ValalaMods
 
         private static bool TokiStepPrefix(Player p, ref bool __result)
         {
+            if (ValalaModsPlugin.IsHeadless)
+                return true;
+
             if (!ShouldBlockTokiStep(p))
                 return true;
 
@@ -128,6 +134,9 @@ namespace ValalaMods
 
         private static void UpdatePostfix(Caster __instance)
         {
+            if (ValalaModsPlugin.IsHeadless)
+                return;
+
             try
             {
                 if (__instance == null)
@@ -455,6 +464,9 @@ namespace ValalaMods
 
         private static bool IsCastKeyDown()
         {
+            if (ValalaModsPlugin.IsHeadless)
+                return false;
+
             return TryParseKey(ValalaModsPlugin.StaffFreeCastKey.Value, out KeyCode key, out bool alt) &&
                    Input.GetKeyDown(key) &&
                    (!alt || IsAltHeld());
@@ -462,6 +474,9 @@ namespace ValalaMods
 
         private static bool IsCastKeyHeld()
         {
+            if (ValalaModsPlugin.IsHeadless)
+                return false;
+
             return TryParseKey(ValalaModsPlugin.StaffFreeCastKey.Value, out KeyCode key, out bool alt) &&
                    Input.GetKey(key) &&
                    (!alt || IsAltHeld());
@@ -494,6 +509,9 @@ namespace ValalaMods
 
         private static bool IsInputBlocked()
         {
+            if (ValalaModsPlugin.IsHeadless)
+                return true;
+
             if (!Application.isFocused ||
                 MTKeys.Bloqueadas ||
                 Caster.MenuOpen ||

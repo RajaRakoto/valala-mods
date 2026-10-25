@@ -38,6 +38,9 @@ namespace ValalaMods
 
         private void Update()
         {
+            if (ValalaModsPlugin.IsHeadless)
+                return;
+
             try
             {
                 if (!_built)

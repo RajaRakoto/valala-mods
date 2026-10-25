@@ -10,6 +10,9 @@ namespace ValalaMods
 
         private void OnGUI()
         {
+            if (ValalaModsPlugin.IsHeadless)
+                return;
+
             if (Event.current == null || Event.current.type != EventType.Repaint)
                 return;
 

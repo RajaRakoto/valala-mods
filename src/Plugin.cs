@@ -17,13 +17,14 @@ namespace ValalaMods
     [BepInDependency("mushokutensei.magia", BepInDependency.DependencyFlags.HardDependency)]
     [BepInDependency("randyknapp.mods.epicloot", BepInDependency.DependencyFlags.HardDependency)]
     [BepInDependency("com.jotunn.jotunn", BepInDependency.DependencyFlags.HardDependency)]
+    [BepInDependency("com.kewb.valheimmjolnir", BepInDependency.DependencyFlags.HardDependency)]
     [BepInDependency("shudnal.ExtraSlots", BepInDependency.DependencyFlags.SoftDependency)]
     [BepInDependency("shudnal.ExtraSlotsCustomSlots", BepInDependency.DependencyFlags.SoftDependency)]
     public class ValalaModsPlugin : BaseUnityPlugin
     {
         public const string PluginGuid = "odin.valala.raja.mods";
         public const string PluginName = "Valala Mods";
-        public const string PluginVersion = "1.3.3";
+        public const string PluginVersion = "1.5.1";
         private const int CastLandingDamageMinQuality = 3;
 
         internal static ConfigEntry<bool> Enabled;
@@ -51,11 +52,25 @@ namespace ValalaMods
         internal static ConfigEntry<bool> LandingThunder;
         internal static ConfigEntry<float> LandingThunderHeight;
         internal static ConfigEntry<float> LandingThunderRadius;
+        internal static ConfigEntry<bool> MjolnirImpactEnabled;
+        internal static ConfigEntry<bool> MjolnirImpactVfx;
+        internal static ConfigEntry<bool> MjolnirImpactDamageEnabled;
+        internal static ConfigEntry<float> MjolnirImpactRadius;
+        internal static ConfigEntry<float> MjolnirImpactDamageAmount;
+        internal static ConfigEntry<float> MjolnirImpactMinSpeed;
+        internal static ConfigEntry<bool> MjolnirImpactStructures;
+        internal static ConfigEntry<bool> MjolnirImpactPlayerStructures;
+        internal static ConfigEntry<float> MjolnirImpactCooldown;
+        internal static ConfigEntry<float> MjolnirHudRightMargin;
+        internal static ConfigEntry<float> MjolnirHudBottomMargin;
+        internal static ConfigEntry<bool> MjolnirMenuEnabled;
+        internal static ConfigEntry<KeyboardShortcut> MjolnirMenuOpenKey;
         internal static KeyCode MenuKeyCode = KeyCode.Semicolon;
         internal static ManualLogSource Log;
         internal static ValalaModsPlugin Instance;
+        internal static bool IsHeadless { get; private set; }
 
-        // Interchangeable presets shown as a dropdown in the r2modman / BepInEx config editor.
+        // Interchangeable presets shown as a dropdown in the Gale / BepInEx config editor.
         private static readonly string[] MenuKeyPresets =
         {
             "Semicolon", "F7", "F8", "F9", "F10",
@@ -78,6 +93,36 @@ namespace ValalaMods
         {
             Instance = this;
             Log = Logger;
+            IsHeadless = Application.isBatchMode ||
+                         SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null;
+
+            try
+            {
+                if (BepInEx.Bootstrap.Chainloader.PluginInfos.TryGetValue(
+                        "com.kewb.valheimmjolnir", out BepInEx.PluginInfo mjolnir))
+                {
+                    Log.LogInfo("Bundled Mjolnir active: v" + mjolnir.Metadata.Version +
+                                " (" + mjolnir.Location + ")");
+
+                    string mjolnirConfigPath = mjolnir.Instance?.Config?.ConfigFilePath;
+                    if (!string.IsNullOrEmpty(mjolnirConfigPath))
+                    {
+                        Log.LogInfo("Mjolnir config: " + mjolnirConfigPath);
+                        if (!string.Equals(Path.GetFileName(mjolnirConfigPath),
+                                ValalaConfigRedirectPlugin.NewFileName,
+                                StringComparison.Ordinal))
+                        {
+                            Log.LogWarning("Mjolnir config path redirect did not apply.");
+                        }
+                    }
+
+                    ApplyBundledMjolnirDefaults(mjolnir.Instance?.Config);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.LogWarning("Could not verify bundled Mjolnir: " + e.Message);
+            }
 
             Enabled = Config.Bind("General", "Enabled", true,
                 "Add or replace an elemental VFX on the Wind Impulse / Wind Boost dash.");
@@ -144,14 +189,57 @@ namespace ValalaMods
                 new ConfigDescription(
                     "High-fall lightning damage radius, meters. Damage uses DamageMin/DamageMax and the ElementalMagic skill.",
                     new AcceptableValueRange<float>(1f, 10f)));
+            MjolnirImpactEnabled = Config.Bind("Mjolnir Impact", "Enabled", true,
+                "Add a lightning strike and area damage when a thrown Mjolnir hits terrain, a structure or an enemy.");
+            MjolnirImpactVfx = Config.Bind("Mjolnir Impact", "LightningVfx", true,
+                "Spawn the lightning strike VFX on terrain and structure impacts. Enemy impacts keep Mjolnir's native bolt.");
+            MjolnirImpactDamageEnabled = Config.Bind("Mjolnir Impact", "Damage", true,
+                "Deal area damage around the impact point.");
+            MjolnirImpactRadius = Config.Bind("Mjolnir Impact", "Radius", 8f,
+                new ConfigDescription(
+                    "Area damage and lightning VFX radius, meters.",
+                    new AcceptableValueRange<float>(1f, 15f)));
+            MjolnirImpactDamageAmount = Config.Bind("Mjolnir Impact", "DamageAmount", 250f,
+                new ConfigDescription(
+                    "Flat lightning damage dealt to each enemy and structure in the radius.",
+                    new AcceptableValueRange<float>(0f, 600f)));
+            MjolnirImpactMinSpeed = Config.Bind("Mjolnir Impact", "MinImpactSpeed", 8f,
+                new ConfigDescription(
+                    "Minimum hammer speed at impact for the effect to trigger, m/s.",
+                    new AcceptableValueRange<float>(0f, 80f)));
+            MjolnirImpactStructures = Config.Bind("Mjolnir Impact", "DamageStructures", true,
+                "Damage structures in the impact radius.");
+            MjolnirImpactPlayerStructures = Config.Bind("Mjolnir Impact", "DamagePlayerStructures", true,
+                "Allow damage to player-built pieces when the local ward access check permits it.");
+            MjolnirImpactCooldown = Config.Bind("Mjolnir Impact", "Cooldown", 0.4f,
+                new ConfigDescription(
+                    "Minimum seconds between two impact effects.",
+                    new AcceptableValueRange<float>(0.1f, 2f)));
+            MjolnirHudRightMargin = Config.Bind("Mjolnir HUD", "RightMargin", 12f,
+                new ConfigDescription(
+                    "Distance in pixels between Mjolnir's ability panel and the right screen edge.",
+                    new AcceptableValueRange<float>(0f, 200f)));
+            MjolnirHudBottomMargin = Config.Bind("Mjolnir HUD", "BottomMargin", 72f,
+                new ConfigDescription(
+                    "Distance in pixels between Mjolnir's ability panel and the bottom screen edge.",
+                    new AcceptableValueRange<float>(0f, 200f)));
+            MjolnirMenuEnabled = Config.Bind("Mjolnir Menu", "Enabled", false,
+                "Allow opening Mjolnir's in-game settings menu. Disabled by default.");
+            MjolnirMenuOpenKey = Config.Bind("Mjolnir Menu", "OpenKey",
+                new KeyboardShortcut(KeyCode.F10, KeyCode.LeftControl, KeyCode.LeftAlt),
+                "Keyboard shortcut that opens Mjolnir's settings menu when Enabled is true. Mjolnir's F4 binding is ignored.");
 
+            MigrateValalaMjolnirDefaults();
             MigrateSelectedElement();
-            MigrateStaffFreeCastKey();
+            if (!IsHeadless)
+                MigrateStaffFreeCastKey();
             RefreshMenuKeyCode();
             RefreshSelectedElement();
             MenuKey.SettingChanged += (_, _) => RefreshMenuKeyCode();
             SelectedElement.SettingChanged += (_, _) => RefreshSelectedElement();
             ValalaRings.Register();
+            MjolnirRecipeOverride.Register();
+            ValalaConsoleCommands.Register();
             ValidateElementRegistry();
 
             if (NorseFxCatalog.Count > 0)
@@ -161,20 +249,32 @@ namespace ValalaMods
             }
 
             SetupConfigWatcher();
-            CreateElementMenu();
-            CreateWindChargeHud();
+            if (!IsHeadless)
+            {
+                CreateElementMenu();
+                CreateWindChargeHud();
+            }
 
             _harmony = new Harmony(PluginGuid);
             try
             {
                 _harmony.PatchAll(typeof(WindImpulsePatch));
                 _harmony.PatchAll(typeof(ZNetAwakePatch));
-                _harmony.PatchAll(typeof(CursorCapturePatch));
-                _harmony.PatchAll(typeof(CameraLookPatch));
                 _harmony.PatchAll(typeof(LandingBoomPatch));
+                MjolnirImpactPatch.Apply(_harmony);
                 SecondTrinketSlot.Apply(_harmony);
-                StaffFreeWindImpulse.Initialize(_harmony);
-                Log.LogInfo(PluginName + " loaded: patched WindImpulseVfx.Spawn (Mode=" + Mode.Value + ", rings + elemental VFX), landing effects and staff-free Wind Impulse (own charge/jump).");
+                if (!IsHeadless)
+                {
+                    _harmony.PatchAll(typeof(CursorCapturePatch));
+                    _harmony.PatchAll(typeof(CameraLookPatch));
+                    StaffFreeWindImpulse.Initialize(_harmony);
+                    MjolnirHudPosition.Apply(_harmony);
+                    MjolnirMenuGuard.Apply(_harmony);
+                }
+                Log.LogInfo(PluginName + " loaded: patched WindImpulseVfx.Spawn (Mode=" + Mode.Value + ", rings + elemental VFX), landing effects" +
+                    (IsHeadless
+                        ? "; headless server mode (client input/UI disabled)."
+                        : " and staff-free Wind Impulse (own charge/jump)."));
             }
             catch (Exception e)
             {
@@ -218,7 +318,7 @@ namespace ValalaMods
 
         internal static bool IsMenuKeyDown()
         {
-            return Input.GetKeyDown(MenuKeyCode);
+            return !IsHeadless && Input.GetKeyDown(MenuKeyCode);
         }
 
         private static void RefreshMenuKeyCode()
@@ -242,6 +342,83 @@ namespace ValalaMods
 
             SelectedElement.Value = "Roche";
             Log.LogInfo("Migrated SelectedElement from Vent/Wind to Roche.");
+        }
+
+        private static void ApplyBundledMjolnirDefaults(ConfigFile config)
+        {
+            if (config == null)
+                return;
+
+            bool changed = false;
+            changed |= ApplyBundledMjolnirDefault(
+                config, "Presentation", "CustomModelFlip", false);
+            changed |= ApplyBundledMjolnirDefault(
+                config, "TerrainImpact", "CratersEnabled", true);
+            changed |= ApplyBundledMjolnirDefault(
+                config, "TerrainImpact", "MaximumRadius", 10f);
+            changed |= ApplyBundledMjolnirDefault(
+                config, "TerrainImpact", "MaximumDepth", 6f);
+            changed |= ApplyBundledMjolnirDefault(
+                config, "TerrainImpact", "DistanceForMaximumContribution", 250f);
+            changed |= ApplyBundledMjolnirDefault(
+                config, "TerrainImpact", "FallAltitudeForMaximumContribution", 40f);
+            changed |= ApplyBundledMjolnirDefault(
+                config, "Throwing", "ImpactDamage", 250f);
+
+            if (changed)
+            {
+                config.Save();
+                Log.LogInfo("Applied Valala's shipped Mjolnir defaults.");
+            }
+        }
+
+        private static bool ApplyBundledMjolnirDefault<T>(
+            ConfigFile config, string section, string key, T value)
+        {
+            if (config == null)
+                return false;
+
+            if (!config.TryGetEntry<T>(section, key, out ConfigEntry<T> entry))
+            {
+                Log.LogWarning(
+                    "Mjolnir config entry missing; default not applied: " +
+                    section + "." + key);
+                return false;
+            }
+
+            // Only touch untouched entries. This also works when a future bundled
+            // Mjolnir version changes its own defaults.
+            if (!object.Equals(entry.Value, entry.DefaultValue) ||
+                object.Equals(entry.Value, value))
+                return false;
+
+            entry.Value = value;
+            return true;
+        }
+
+        private static void MigrateValalaMjolnirDefaults()
+        {
+            bool changed = false;
+            changed |= MigrateDefault(MjolnirImpactRadius, 5f, 8f);
+            changed |= MigrateDefault(MjolnirImpactDamageAmount, 120f, 250f);
+            changed |= MigrateDefault(MjolnirImpactMinSpeed, 12f, 8f);
+            changed |= MigrateDefault(MjolnirHudBottomMargin, 24f, 72f);
+
+            if (changed)
+            {
+                Instance.Config.Save();
+                Log.LogInfo("Applied Valala's shipped Mjolnir impact and HUD defaults.");
+            }
+        }
+
+        private static bool MigrateDefault<T>(
+            ConfigEntry<T> entry, T previous, T current)
+        {
+            if (entry == null || !EqualityComparer<T>.Default.Equals(entry.Value, previous))
+                return false;
+
+            entry.Value = current;
+            return true;
         }
 
         private void MigrateStaffFreeCastKey()
@@ -278,7 +455,7 @@ namespace ValalaMods
             }
         }
 
-        // Watches the .cfg so edits made in r2modman (or any editor) apply without restarting the game.
+        // Watches the .cfg so edits made in Gale (or any editor) apply without restarting the game.
         private void SetupConfigWatcher()
         {
             try
@@ -339,6 +516,7 @@ namespace ValalaMods
 
         private void OnDestroy()
         {
+            MjolnirRecipeOverride.Unregister();
             NorseFxResolver.Unload();
 
             if (_configWatcher == null)
@@ -414,7 +592,24 @@ namespace ValalaMods
             float level = player.GetSkillLevel(Skills.SkillType.ElementalMagic);
             float damage = Mathf.Lerp(DamageMin.Value, DamageMax.Value, Mathf.Clamp01(level / 100f));
             damage *= ValalaRings.GetDamageMultiplier(player, element);
+            DamageEnemiesAtCore(player, center, radius, def, damage, level);
+        }
 
+        // Flat-damage path used by the Mjolnir impact: no Valala ring required.
+        internal static void DamageEnemiesWithLightning(
+            Player player, Vector3 center, float radius, float damage)
+        {
+            if (player == null)
+                return;
+
+            float level = player.GetSkillLevel(Skills.SkillType.ElementalMagic);
+            DamageEnemiesAtCore(
+                player, center, radius, ElementRegistry.Get(Element.Lightning), damage, level);
+        }
+
+        private static void DamageEnemiesAtCore(
+            Player player, Vector3 center, float radius, ElementDef def, float damage, float level)
+        {
             float radiusSqr = radius * radius;
 
             // Snapshot: damage may be applied immediately on host/SP and mutate the live list.

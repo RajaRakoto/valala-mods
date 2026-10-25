@@ -91,6 +91,41 @@ namespace ValalaMods
             return 1f + bonus + perLevel * (quality - 1);
         }
 
+        internal static bool TryGive(Element element, int quality, out string message)
+        {
+            Player player = Player.m_localPlayer;
+            if (player == null || player.GetInventory() == null)
+            {
+                message = "No local player is available.";
+                return false;
+            }
+
+            ObjectDB db = ObjectDB.instance;
+            GameObject prefab = db != null ? db.GetItemPrefab(PrefabName(element)) : null;
+            ItemDrop drop = prefab != null ? prefab.GetComponent<ItemDrop>() : null;
+            if (drop == null || drop.m_itemData == null)
+            {
+                message = "Ring prefab is not registered: " + PrefabName(element) + ".";
+                return false;
+            }
+
+            ItemDrop.ItemData item = drop.m_itemData.Clone();
+            item.m_quality = Mathf.Clamp(quality, 1, MaxQuality);
+            item.m_stack = 1;
+            item.m_dropPrefab = prefab;
+            item.m_durability = item.m_shared.m_maxDurability;
+
+            if (!player.GetInventory().AddItem(item))
+            {
+                message = "Inventory is full; ring could not be added.";
+                return false;
+            }
+
+            message = "Gave " + ElementRegistry.Get(element).Name +
+                      " ring at quality " + item.m_quality + ".";
+            return true;
+        }
+
         internal static int GetEquippedQuality(Player player, Element element)
         {
             string prefabName = PrefabName(element);
